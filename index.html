@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Tiêu đề tab hoàn toàn bình thường, không gây nghi ngờ -->
+    <title>Đang tải...</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải Font Inter hiện đại -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Hiệu ứng vòng xoay loading tiêu chuẩn */
+        @keyframes spinSmooth {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner-ring {
+            animation: spinSmooth 0.9s linear infinite;
+        }
+
+        /* =========================================================
+           HIỆU ỨNG JUMPSCARE TOÀN MÀN HÌNH (RUNG LẮC + NHẤP NHÁY)
+           ========================================================= */
+        @keyframes violentShake {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1.08); }
+            10% { transform: translate(-30px, -25px) rotate(-5deg) scale(1.18); }
+            20% { transform: translate(30px, 20px) rotate(5deg) scale(1.1); }
+            30% { transform: translate(-35px, 25px) rotate(-4deg) scale(1.25); }
+            40% { transform: translate(35px, -30px) rotate(6deg) scale(1.14); }
+            50% { transform: translate(-25px, 30px) rotate(-6deg) scale(1.22); }
+            60% { transform: translate(30px, -20px) rotate(4deg) scale(1.09); }
+            70% { transform: translate(-30px, -30px) rotate(-5deg) scale(1.26); }
+            80% { transform: translate(24px, 24px) rotate(5deg) scale(1.15); }
+            90% { transform: translate(-20px, -15px) rotate(-3deg) scale(1.2); }
+            100% { transform: translate(0, 0) rotate(0deg) scale(1.08); }
+        }
+
+        @keyframes strobeFlash {
+            0%, 45% { background-color: #000000; }
+            46%, 72% { background-color: #dc2626; } /* Đỏ máu */
+            73%, 100% { background-color: #ffffff; } /* Trắng chói */
+        }
+
+        @keyframes imageInvertFlash {
+            0%, 60% { filter: contrast(160%) brightness(105%) invert(0); }
+            61%, 80% { filter: contrast(260%) brightness(150%) invert(1); }
+            81%, 100% { filter: contrast(220%) sepia(100%) hue-rotate(-50deg) saturate(600%); }
+        }
+
+        .scare-strobe-bg {
+            animation: strobeFlash 0.08s infinite !important;
+        }
+
+        .scare-image-motion {
+            animation: violentShake 0.1s infinite, imageInvertFlash 0.16s infinite !important;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen bg-slate-50 text-slate-800 flex items-center justify-center">
+
+    <!-- =========================================================
+         PHẦN 1: GIAO DIỆN LOADING SẠCH SẼ, BÌNH THƯỜNG (1% -> 100%)
+         ========================================================= -->
+    <main id="loadingScreen" class="w-full max-w-md px-6 flex flex-col items-center text-center">
+        <!-- Vòng xoay tải trang tối giản -->
+        <div class="relative w-14 h-14 mb-6 flex items-center justify-center">
+            <div class="absolute inset-0 rounded-full border-4 border-slate-200"></div>
+            <div class="spinner-ring absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600"></div>
+        </div>
+
+        <!-- Dòng chữ hiển thị phần trăm tăng dần từ 1% đến 100% -->
+        <h1 id="loadingText" class="text-lg sm:text-xl font-semibold text-slate-800 tracking-tight mb-2">
+            Đang tải dữ liệu... 1%
+        </h1>
+
+        <p id="subStatusText" class="text-xs sm:text-sm text-slate-400 mb-6">
+            Vui lòng giữ nguyên màn hình trong giây lát...
+        </p>
+
+        <!-- Thanh tiến trình mượt mà -->
+        <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+            <div id="progressBar" class="h-full bg-blue-600 rounded-full transition-all duration-150 ease-out" style="width: 1%;"></div>
+        </div>
+    </main>
+
+    <!-- =========================================================
+         PHẦN 2: MÀN HÌNH JUMPSCARE TOÀN MÀN HÌNH (ẨN BAN ĐẦU)
+         ========================================================= -->
+    <div id="scareOverlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-black overflow-hidden">
+        <img id="scareImage" src="" alt="" class="w-full h-full object-cover sm:object-contain scare-image-motion pointer-events-none select-none">
+    </div>
+
+    <!-- Thẻ Audio phát tiếng hét -->
+    <audio id="scareAudio" preload="auto" loop></audio>
+
+    <script>
+        /* =========================================================================
+           CẤU HÌNH HÌNH ẢNH & ÂM THANH KINH DỊ (TỰ THAY TRỰC TIẾP TRONG CODE):
+           -------------------------------------------------------------------------
+           1. Thay hình ảnh kinh dị (HORROR_IMAGE_SRC):
+              - Tải ảnh lên cùng thư mục với file HTML trên GitHub và điền tên file:
+                const HORROR_IMAGE_SRC = "anh_ma.jpg";
+              - Hoặc dán trực tiếp đường link ảnh (URL) / chuỗi Base64 vào bên dưới.
+              - Mặc định đã tích hợp sẵn hình SVG gương mặt quỷ dị siêu nét để chạy
+                ngay lập tức kể cả khi bạn chưa kịp thêm ảnh.
+
+           2. Thay âm thanh la hét (HORROR_AUDIO_SRC):
+              - Tải file âm thanh (.mp3 hoặc .wav) lên cùng thư mục với file HTML trên
+                GitHub và điền đúng tên file vào dòng dưới đây:
+                const HORROR_AUDIO_SRC = "doama.mp3";
+           ========================================================================= */
+
+        // 👇 THAY TÊN FILE ẢNH (VD: "anh_ma.jpg"), LINK ẢNH HOẶC BASE64 CỦA BẠN TẠI ĐÂY:
+        const HORROR_IMAGE_SRC = "data:image/svg+xml;utf8," + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+                <rect width="800" height="800" fill="#030303"/>
+                <defs>
+                    <radialGradient id="paleSkin" cx="50%" cy="44%" r="52%">
+                        <stop offset="0%" stop-color="#f8fafc"/>
+                        <stop offset="60%" stop-color="#64748b"/>
+                        <stop offset="100%" stop-color="#020617"/>
+                    </radialGradient>
+                    <filter id="creepyDistort">
+                        <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="3" result="noise"/>
+                        <feDisplacementMap in="SourceGraphic" in2="noise" scale="20" />
+                    </filter>
+                </defs>
+                <g filter="url(#creepyDistort)">
+                    <!-- Khuôn mặt hốc hác -->
+                    <ellipse cx="400" cy="390" rx="220" ry="300" fill="url(#paleSkin)"/>
+                    <!-- Quầng mắt đen sâu -->
+                    <ellipse cx="305" cy="300" rx="64" ry="78" fill="#000000"/>
+                    <ellipse cx="495" cy="300" rx="64" ry="78" fill="#000000"/>
+                    <!-- Đồng tử đỏ rực nhìn thẳng -->
+                    <circle cx="305" cy="305" r="13" fill="#ff0000"/>
+                    <circle cx="305" cy="305" r="4" fill="#ffffff"/>
+                    <circle cx="495" cy="305" r="13" fill="#ff0000"/>
+                    <circle cx="495" cy="305" r="4" fill="#ffffff"/>
+                    <!-- Vệt máu chảy dài từ hốc mắt -->
+                    <path d="M288 372 Q280 460 270 535" stroke="#990000" stroke-width="12" fill="none" stroke-linecap="round"/>
+                    <path d="M512 372 Q525 470 535 545" stroke="#990000" stroke-width="14" fill="none" stroke-linecap="round"/>
+                    <!-- Hốc mũi -->
+                    <path d="M384 410 L366 465 L395 452 Z" fill="#000000"/>
+                    <path d="M416 410 L434 465 L405 452 Z" fill="#000000"/>
+                    <!-- Miệng há rộng gào thét -->
+                    <ellipse cx="400" cy="580" rx="102" ry="132" fill="#000000" stroke="#450a0a" stroke-width="14"/>
+                    <!-- Răng nhọn sắc lẹm -->
+                    <polygon points="322,492 340,536 356,486" fill="#e2e8f0"/>
+                    <polygon points="362,482 380,532 396,482" fill="#e2e8f0"/>
+                    <polygon points="404,482 420,532 438,482" fill="#e2e8f0"/>
+                    <polygon points="444,486 460,536 478,492" fill="#e2e8f0"/>
+                    <polygon points="335,675 352,625 370,680" fill="#e2e8f0"/>
+                    <polygon points="384,685 400,630 416,685" fill="#e2e8f0"/>
+                    <polygon points="430,680 448,625 465,675" fill="#e2e8f0"/>
+                </g>
+            </svg>
+        `);
+
+        // 👇 THAY TÊN FILE ÂM THANH MP3 TRÊN GITHUB (VD: "doama.mp3") HOẶC LINK MP3 TẠI ĐÂY:
+        const HORROR_AUDIO_SRC = "doama.mp3";
+
+        // =========================================================================
+        // XỬ LÝ MỞ KHÓA THẺ <AUDIO> SỚM & CHẠY TIẾN TRÌNH 1% -> 100%
+        // =========================================================================
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loadingText = document.getElementById('loadingText');
+        const subStatusText = document.getElementById('subStatusText');
+        const progressBar = document.getElementById('progressBar');
+        const scareOverlay = document.getElementById('scareOverlay');
+        const scareImage = document.getElementById('scareImage');
+        const scareAudio = document.getElementById('scareAudio');
+
+        scareImage.src = HORROR_IMAGE_SRC;
+        if (HORROR_AUDIO_SRC) {
+            scareAudio.src = HORROR_AUDIO_SRC;
+        }
+
+        let audioUnlocked = false;
+        let isTriggered = false;
+
+        // Mở khóa thẻ <audio> ngay khi người dùng chạm/click/bấm phím bất kỳ lúc đang chờ
+        function unlockAudioOnInteraction() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+
+            // Mồi sẵn thẻ <audio> ở mức âm lượng 0 rồi tạm dừng ngay để trình duyệt cho phép phát to ở mốc 100%
+            if (scareAudio.src) {
+                scareAudio.volume = 0;
+                const p = scareAudio.play();
+                if (p !== undefined) {
+                    p.then(() => {
+                        if (!isTriggered) {
+                            scareAudio.pause();
+                            scareAudio.currentTime = 0;
+                            scareAudio.volume = 1.0;
+                        }
+                    }).catch(() => {});
+                }
+            }
+        }
+
+        ['pointerdown', 'touchstart', 'click', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, unlockAudioOnInteraction, { passive: true });
+        });
+
+        // Yêu cầu bật chế độ toàn màn hình (Fullscreen)
+        function triggerFullscreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(() => {});
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+        }
+
+        // Kích hoạt màn hình kinh dị toàn màn hình khi đạt 100%
+        function activateJumpscare() {
+            if (isTriggered) return;
+            isTriggered = true;
+
+            // 1. Bật toàn màn hình
+            triggerFullscreen();
+
+            // 2. Ẩn màn hình loading, bật màn hình kinh dị nhấp nháy đỏ/đen/trắng
+            loadingScreen.classList.add('hidden');
+            scareOverlay.classList.remove('hidden');
+            scareOverlay.classList.add('flex', 'scare-strobe-bg');
+
+            // 3. Rung điện thoại liên hồi (nếu mở trên thiết bị di động hỗ trợ)
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 80, 500, 80, 700, 80, 900]);
+            }
+
+            // 4. Phát file âm thanh từ biến HORROR_AUDIO_SRC qua thẻ <audio>
+            if (HORROR_AUDIO_SRC) {
+                scareAudio.volume = 1.0;
+                scareAudio.play().catch(() => {});
+            }
+        }
+
+        // Vòng lặp tăng tiến độ tự nhiên từ 1% đến 100%
+        function startLoadingSequence() {
+            let currentPercent = 1;
+
+            function step() {
+                if (currentPercent >= 100) {
+                    loadingText.textContent = "Đang tải dữ liệu... 100%";
+                    progressBar.style.width = "100%";
+                    // Chạm đúng 100% -> Kích hoạt hù ma ngay lập tức
+                    setTimeout(activateJumpscare, 120);
+                    return;
+                }
+
+                // Tăng ngẫu nhiên 1-3% mỗi nhịp để tạo cảm giác tải thật
+                const increment = currentPercent > 85 ? 1 : Math.floor(Math.random() * 3) + 1;
+                currentPercent = Math.min(100, currentPercent + increment);
+
+                loadingText.textContent = `Đang tải dữ liệu... ${currentPercent}%`;
+                progressBar.style.width = `${currentPercent}%`;
+
+                if (currentPercent === 50) {
+                    subStatusText.textContent = "Đang đồng bộ tài nguyên...";
+                } else if (currentPercent === 85) {
+                    subStatusText.textContent = "Sắp hoàn tất, vui lòng đợi...";
+                }
+
+                // Khựng nhẹ ở 98-99% trong nửa giây để tăng sự tập trung rồi bùng nổ ở 100%
+                let nextDelay = 45 + Math.random() * 65;
+                if (currentPercent === 98 || currentPercent === 99) {
+                    nextDelay = 380;
+                }
+
+                setTimeout(step, nextDelay);
+            }
+
+            setTimeout(step, 250);
+        }
+
+        // Bắt đầu chạy ngay khi mở trang
+        window.addEventListener('load', startLoadingSequence);
+    </script>
+</body>
+</html>
